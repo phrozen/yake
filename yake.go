@@ -67,6 +67,34 @@ func New(config Config) (*Yake, error) {
 	return &Yake{config: config, stopWords: sw}, nil
 }
 
+// Normalize tokenizes text using the YAKE pipeline and returns a clean list
+// of individual non-stopword keywords. Words are lowercased and singularized.
+// Duplicates are removed and order follows first occurrence in the input.
+//
+// This is useful for building inverted indexes and processing search queries
+// without running the full scoring pipeline.
+func (y *Yake) Normalize(text string) []string {
+	sentences := y.preprocessText(text)
+	seen := make(map[string]struct{})
+	var tokens []string
+	for _, s := range sentences {
+		for i, uq := range s.uqTerms {
+			if s.tags[i] == TagDigit || s.tags[i] == TagPunctuation || s.tags[i] == TagUnparsable {
+				continue
+			}
+			if s.stopwordFlags[i] {
+				continue
+			}
+			if _, ok := seen[uq]; ok {
+				continue
+			}
+			seen[uq] = struct{}{}
+			tokens = append(tokens, uq)
+		}
+	}
+	return tokens
+}
+
 // Extract extracts up to n keywords from text, sorted by score (best first).
 //
 // The pipeline:
